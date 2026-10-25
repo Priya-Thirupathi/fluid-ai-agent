@@ -35,7 +35,7 @@ async def agent(body: AgentRequest) -> AgentResponse:
     summary = (
         f"Created '{state.title}' with {len(state.sections)} sections "
         f"from {len(state.tasks)} tasks. Flagged {len(state.assumptions)} assumptions. "
-        f"Review {'approved' if state.review and state.review.approved else 'not fully approved'}"
+        f"Review {'approved' if state.review and state.review.approved else 'not fully approved'} "
         f"after {state.revision_count} revision(s)."
     )
     return AgentResponse(

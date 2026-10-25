@@ -25,6 +25,17 @@ def add_table(doc: DocxDocument, rows: list[list[str]]) -> None:
                 run.bold = True
 
 
+def add_text(doc: DocxDocument, text: str) -> None:
+    for line in text.replace("**", "").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(("- ", "• ")):
+            doc.add_paragraph(line[2:], style="List Bullet")
+        else:
+            doc.add_paragraph(line)
+
+
 def build_docx(state: AgentState) -> AgentState:
     OUTPUT_DIR.mkdir(exist_ok=True)
     doc = Document()
@@ -39,12 +50,10 @@ def build_docx(state: AgentState) -> AgentState:
     for section in state.sections:
         doc.add_heading(section.heading, level=1)
         if section.text:
-            for paragraph in section.text.split("\n\n"):
-                if paragraph.strip():
-                    doc.add_paragraph(paragraph.strip())
+            add_text(doc, section.text)
         if section.table:
             add_table(doc, section.table)
-
+            
     state.document_id = uuid4().hex
     doc.save(OUTPUT_DIR / f"{state.document_id}.docx")
     return state

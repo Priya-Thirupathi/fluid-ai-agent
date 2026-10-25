@@ -8,6 +8,8 @@ from pydantic import BaseModel, ConfigDict
 from llm import ask_json
 from models import AgentState, Section, Task
 
+logger = logging.getLogger(__name__)
+
 ToolFunc = Callable[[Task, AgentState], Awaitable[None]]
 
 
@@ -19,8 +21,6 @@ class Tool:
 
 
 TOOLS: dict[str, Tool] = {}
-
-logger = logging.getLogger(__name__)
 
 
 def tool(name: str, description: str):
@@ -56,6 +56,12 @@ MOCK_DATA = {
     "start_date": "3 November 2026",
 }
 
+WRITING_RULES = (
+    "Use the company data where relevant. If it conflicts with the request, follow the request. "
+    "Stay consistent with the assumptions and decisions already made. "
+    "Never invent names of people. If the company data has no fitting person, refer to the role. "
+)
+
 
 class SectionText(BaseModel):
     text: str
@@ -63,16 +69,27 @@ class SectionText(BaseModel):
 
 class TableRows(BaseModel):
     model_config = ConfigDict(coerce_numbers_to_str=True)
+
     rows: list[list[str]]
 
 
 def section_prompt(task: Task, state: AgentState) -> str:
     return (
         f"Request: {state.request}\n"
+        f"Assumptions and decisions: {json.dumps(state.assumptions)}\n"
         f"Section: {task.title}\n"
         f"Instructions: {task.details}\n"
         f"Company data: {json.dumps(state.context)}"
     )
+
+
+def save_section(state: AgentState, section: Section) -> None:
+    for i, existing in enumerate(state.sections):
+        if existing.heading.lower() == section.heading.lower():
+            section.heading = existing.heading
+            state.sections[i] = section
+            return
+    state.sections.append(section)
 
 
 @tool("lookup_data", "Fetch company data such as team members, budget and start date")
@@ -87,14 +104,14 @@ async def write_section(task: Task, state: AgentState) -> None:
     result = await ask_json(
         system=(
             f"You write one section of a {state.doc_type}. "
-            "Use the company data where relevant. If it conflicts with the request, follow the request. "
-            "Write plain paragraphs separated by blank lines, with no markdown."
+            f"{WRITING_RULES}"
+            "Write plain paragraphs separated by blank lines, with no markdown. "
             'Return JSON: {"text": "..."}'
         ),
         user=section_prompt(task, state),
         schema=SectionText,
     )
-    state.sections.append(Section(heading=task.title, text=result.text))
+    save_section(state, Section(heading=task.title, text=result.text))
 
 
 @tool(
@@ -105,10 +122,10 @@ async def make_table(task: Task, state: AgentState) -> None:
     result = await ask_json(
         system=(
             f"You create one table for a {state.doc_type}. "
-            "Use the company data where relevant. If it conflicts with the request, follow the request. "
+            f"{WRITING_RULES}"
             'Return JSON: {"rows": [["Header 1", "Header 2"], ["cell", "cell"]]}. The first row is the header.'
         ),
         user=section_prompt(task, state),
         schema=TableRows,
     )
-    state.sections.append(Section(heading=task.title, table=result.rows))
+    save_section(state, Section(heading=task.title, table=result.rows))

@@ -12,15 +12,22 @@ SYSTEM_PROMPT = """You are the planner of an autonomous agent that produces busi
 Read the user's request and plan the document.
 
 1. Decide the document type and a clear title.
-2. Look for missing information and conflicting or unrealistic requirements. For each one, state the assumption you will make or the risk you see. Never pretend a conflicting requirement is fine.
-3. Break the work into 4 to 7 tasks, in document order. Each task produces one part of the document. Start with a lookup_data task if company data(team, budget, dates) would help.
+2. Look for missing information and conflicting or unrealistic requirements.
+    For missing information, state the assumption you make.
+    For a conflict, say plainly that it is a risk and state the decision you make to handle it
+    (for example reducing scope or phasing the work). Never assume a conflict away.
+    Do not assume values that company data can provide (team, budget, start date); a lookup_data task will fetch them.
+3. Break the work into 4 to 7 tasks, in document order. Each task produces one part of the document.
+    Each task title is the section heading exactly as it should appear in the document
+    (for example "Action Items", not "Create action items table").
+    Start with a lookup_data task if company data (team, budget, dates) would help.
 
 Available tools:
 {tools}
 
 Return JSON:
-  {{"title": "...", "doc_type": "...", "assumptions": ["..."],
-    "tasks": [{{"title": "...", "tool": "<tool name>", "details": "what this part must contain"}}]}}"""
+{{"title": "...", "doc_type": "...", "assumptions": ["..."],
+"tasks": [{{"title": "...", "tool": "<tool name>", "details": "what this part must contain"}}]}}"""
 
 
 class Plan(BaseModel):
@@ -38,6 +45,7 @@ async def plan(state: AgentState) -> AgentState:
     )
     ensure_known_tools(result.tasks)
     logger.info("Planned %d tasks for %r", len(result.tasks), result.title)
+
     state.title = result.title
     state.doc_type = result.doc_type
     state.assumptions = result.assumptions
