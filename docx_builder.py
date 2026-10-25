@@ -53,7 +53,7 @@ def build_docx(state: AgentState) -> AgentState:
             add_text(doc, section.text)
         if section.table:
             add_table(doc, section.table)
-            
+
     state.document_id = uuid4().hex
     doc.save(OUTPUT_DIR / f"{state.document_id}.docx")
     return state
