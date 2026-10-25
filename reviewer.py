@@ -52,7 +52,9 @@ async def reflect(state: AgentState) -> AgentState:
         schema=Review,
     )
     ensure_known_tools(review.fix_tasks)
+    tools_by_heading = {planned.title.lower(): planned.tool for planned in state.tasks}
     for task in review.fix_tasks:
+        task.tool = tools_by_heading.get(task.title.lower(), task.tool)
         task.source = "review"
     logger.info("Review approved=%s, gaps=%s", review.approved, review.gaps)
 
